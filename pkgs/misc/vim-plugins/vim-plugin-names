@@ -500,6 +500,7 @@ Valodim/deoplete-notmuch
 vhda/verilog_systemverilog.vim
 vim-airline/vim-airline
 vim-airline/vim-airline-themes
+vim-ctrlspace/vim-ctrlspace
 vim-pandoc/vim-pandoc
 vim-pandoc/vim-pandoc-after
 vim-pandoc/vim-pandoc-syntax

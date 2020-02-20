@@ -3632,6 +3632,17 @@ let
     };
   };
 
+  vim-ctrlspace = buildVimPluginFrom2Nix {
+    pname = "vim-ctrlspace";
+    version = "2020-01-07";
+    src = fetchFromGitHub {
+      owner = "vim-ctrlspace";
+      repo = "vim-ctrlspace";
+      rev = "88da905e65ee070d3db450b1832ffe171db894a4";
+      sha256 = "1jpmvc0il7fbkxy54x4hidywp22ar84wnw2x5g5djbglj90fw8f1";
+    };
+  };
+
   vim-cursorword = buildVimPluginFrom2Nix {
     pname = "vim-cursorword";
     version = "2020-02-01";
