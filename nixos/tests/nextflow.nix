@@ -25,10 +25,13 @@ import ./make-test-python.nix (
       runtimeInputs = [ pkgs.nextflow ];
       text = ''
         export NXF_OFFLINE=true
-        for b in false true; do
-          echo "docker.enabled = $b" > nextflow.config
-          cat nextflow.config
-          nextflow run -ansi-log false ${hello}
+        for d in false true; do
+          for t in false true; do
+            echo "docker.enabled = $d" > nextflow.config
+            echo "trace.enabled = $t" >> nextflow.config
+            cat nextflow.config
+            nextflow run -ansi-log false ${hello}
+          done
         done
       '';
     };
