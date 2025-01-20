@@ -4,7 +4,7 @@
   fetchFromGitHub,
   makeWrapper,
   openjdk,
-  gradle_8,
+  gradle,
   wget,
   which,
   gnused,
@@ -14,39 +14,21 @@
   testers,
   nixosTests,
 }:
-let
-  # "Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0."
-  gradle = gradle_8;
-in
 stdenv.mkDerivation (finalAttrs: {
   pname = "nextflow";
-  # 24.08.0-edge is compatible with Java 21. The current (as of 2024-09-19)
-  # nextflow release (24.04.4) does not yet support java21, but java19. The
-  # latter is not in nixpkgs(-unstable) anymore.
-  version = "24.08.0-edge";
+  version = "v24.09.2-edge-12-gd62a5dd69";
 
   src = fetchFromGitHub {
-    owner = "nextflow-io";
+    owner = "rollf";
     repo = "nextflow";
-    rev = "6e866ae81ff3bf8a9729e9dbaa9dd89afcb81a4b";
-    hash = "sha256-SA27cuP3iO5kD6u0uTeEaydyqbyJzOkVtPrb++m3Tv0=";
+    rev = "a1eb9a5e7207107077561f49e65eeb79d308447d";
+    hash = "sha256-n/NhosDoZcqGkFLJvLt9QPU+aLrriswwYMJWLC7E8PU=";
   };
 
   nativeBuildInputs = [
     makeWrapper
     gradle
   ];
-
-  postPatch = ''
-    # Nextflow invokes the constant "/bin/bash" (not as a shebang) at
-    # several locations so we fix that globally. However, when running inside
-    # a container, we actually *want* "/bin/bash". Thus the global fix needs
-    # to be reverted for this specific use case.
-    substituteInPlace modules/nextflow/src/main/groovy/nextflow/executor/BashWrapperBuilder.groovy \
-      --replace-fail "['/bin/bash'," "['${bash}/bin/bash'," \
-      --replace-fail "if( containerBuilder ) {" "if( containerBuilder ) {
-                launcher = launcher.replaceFirst(\"/nix/store/.*/bin/bash\", \"/bin/bash\")"
-  '';
 
   mitmCache = gradle.fetchDeps {
     inherit (finalAttrs) pname;
@@ -60,7 +42,7 @@ stdenv.mkDerivation (finalAttrs: {
   # See https://github.com/NixOS/nixpkgs/pull/339197#discussion_r1747749061
   gradleUpdateTask = "pack";
   # The installer attempts to copy a final JAR to $HOME/.nextflow/...
-  gradleFlags = [ "-Duser.home=\$TMPDIR" ];
+  gradleFlags = [ "-Duser.home=$TMPDIR" ];
   preBuild = ''
     # See Makefile (`make pack`)
     export BUILD_PACK=1
@@ -71,7 +53,7 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
 
     mkdir -p $out/bin
-    install -Dm755 build/releases/nextflow-${finalAttrs.version}-dist $out/bin/nextflow
+    install -Dm755 build/releases/nextflow-*dist $out/bin/nextflow
 
     runHook postInstall
   '';
@@ -80,6 +62,7 @@ stdenv.mkDerivation (finalAttrs: {
     wrapProgram $out/bin/nextflow \
       --prefix PATH : ${
         lib.makeBinPath [
+          bash
           coreutils
           gawk
           gnused
