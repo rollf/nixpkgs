@@ -1,11 +1,38 @@
 import ./make-test-python.nix (
   { pkgs, ... }:
   let
-    bash = pkgs.dockerTools.pullImage {
-      imageName = "quay.io/nextflow/bash";
-      imageDigest = "sha256:bea0e244b7c5367b2b0de687e7d28f692013aa18970941c7dd184450125163ac";
-      sha256 = "161s9f24njjx87qrwq0c9nmnwvyc6iblcxka7hirw78lm7i9x4w5";
-      finalImageName = "quay.io/nextflow/bash";
+    # The Nextflow community insists on `/bin/bash` being the entry point for
+    # containers and using (usually) the same interpreter for both executing a
+    # task directly on the host and inside a container. NixOS insists on
+    # `/bin/bash` not being available. Thus, scripts need to use `/usr/bin/env
+    # bash` as interpreter when executed on the (NixOS) host but `/bin/bash`
+    # when run inside a container. `/usr/bin/env bash` *may* work on the
+    # container but that should not be assumed. Thus, we create an image that
+    # provides only `/bin/bash` and assert (see below) that `/usr/bin/env bash`
+    # cannot be invoked inside the container.
+    bin-bash = pkgs.dockerTools.buildImage {
+      name = "bin-bash";
+      tag = "latest";
+      created = "now";
+      copyToRoot = pkgs.buildEnv {
+        name = "image-root";
+        # When tracing is enabled, nextflow needs several other tools including
+        # `touch` which is provided by coreutils; coreutils does provide `env`,
+        # too.
+        paths = [
+          pkgs.bash
+          pkgs.coreutils
+          pkgs.gawk
+          pkgs.gnugrep
+          pkgs.gnused
+          pkgs.ps
+        ];
+        pathsToLink = [ "/bin" ];
+      };
+      runAsRoot = ''
+        # For completeness, do not make `env` available at all.
+        rm /bin/env
+      '';
     };
 
     hello = pkgs.stdenv.mkDerivation {
@@ -25,10 +52,16 @@ import ./make-test-python.nix (
       runtimeInputs = [ pkgs.nextflow ];
       text = ''
         export NXF_OFFLINE=true
-        for b in false true; do
-          echo "docker.enabled = $b" > nextflow.config
-          cat nextflow.config
-          nextflow run -ansi-log false ${hello}
+        # Make sure a container is used that provides /bin/bash but not /usr/bin/env.
+        echo "process.container = 'bin-bash'" > base.nextflow.config
+        for d in false true; do
+          for t in false true; do
+            rm -f nextflow.config; cp base.nextflow.config nextflow.config
+            echo "docker.enabled = $d" >> nextflow.config
+            echo "trace.enabled = $t" >> nextflow.config
+            cat nextflow.config
+            nextflow run -ansi-log false ${hello}
+          done
         done
       '';
     };
@@ -53,7 +86,11 @@ import ./make-test-python.nix (
       ''
         start_all()
         machine.wait_for_unit("docker.service")
-        machine.succeed("docker load < ${bash}")
+        machine.succeed("docker load < ${bin-bash}")
+        machine.succeed("docker run bin-bash /bin/bash")
+        machine.fail("docker run bin-bash env")
+        machine.fail("docker run bin-bash /bin/env")
+        machine.fail("docker run bin-bash /usr/bin/env")
         machine.succeed("run-nextflow-pipeline >&2")
       '';
   }
