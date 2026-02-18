@@ -10,7 +10,6 @@
   gnused,
   gawk,
   coreutils,
-  bash,
   testers,
   nixosTests,
 }:
@@ -35,15 +34,14 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   postPatch = ''
-    # Nextflow invokes the constant "/bin/bash" (not as a shebang) at
-    # several locations so we fix that globally. However, when running inside
-    # a container, we actually *want* "/bin/bash". Thus the global fix needs
-    # to be reverted for this specific use case.
+    # Nextflow invokes "/bin/bash" as the default shell. This does not work
+    # within NixOS. When a Nextflow task runs inside a container, "/bin/bash"
+    # is actually fine.
+    # We assume that "/usr/bin/env -S bash" *always* works, no matter whether
+    # running the task inside or outside a container.
     substituteInPlace modules/nextflow/src/main/groovy/nextflow/executor/BashWrapperBuilder.groovy \
-      --replace-fail "['/bin/bash'," "['${bash}/bin/bash'," \
-      --replace-fail '? "/bin/bash"' '? "'${bash}'/bin/bash"' \
-      --replace-fail "if( containerBuilder ) {" "if( containerBuilder ) {
-                launcher = launcher.replaceFirst(\"/nix/store/.*/bin/bash\", \"/bin/bash\")"
+      --replace-fail "['/bin/bash'," "['/usr/bin/env', '-S','bash'," \
+      --replace-fail '? "/bin/bash"' '? "/usr/bin/env -S bash"'
   '';
 
   mitmCache = gradle.fetchDeps {
